@@ -55,7 +55,9 @@ jobs:
       STRIPE_SECRET_KEY: sk_test_fake_key
       STRIPE_WEBHOOK_SECRET: whsec_fake_secret
       FRONTEND_URL: http://localhost:3000
-      
+      DEFAULT_EMAIL_FROM: no-reply@domus.com
+
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
