@@ -19,6 +19,43 @@ jobs:
   test:
     name: Run Tests
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: domus_test_db
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_password
+        ports:
+          - 5432:5432
+        # Healthcheck para garantir que o banco subiu antes dos testes rodarem
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      NODE_ENV: test
+      DATABASE_USER: test_user
+      DATABASE_PASSWORD: test_password
+      DATABASE_NAME: domus_test_db
+      DATABASE_URL: postgres://test_user:test_password@localhost:5432/domus_test_db
+      JWT_SECRET: fake_secret_for_tests_123
+      JWT_REFRESH_SECRET: fake_refresh_secret_for_tests_123
+      JWT_RESET_SECRET: fake_reset_secret_for_tests_123
+      AWS_ACCESS_KEY_ID: fake_aws_key
+      AWS_SECRET_ACCESS_KEY: fake_aws_secret
+      AWS_REGION: us-east-1
+      AWS_S3_BUCKET_NAME: domus-test-bucket
+      AWS_SQS_EMAIL_QUEUE_NAME: test-email-queue
+      AWS_SQS_EMAIL_QUEUE_URL: https://sqs.us-east-1.amazonaws.com/000000000000/test-email-queue
+      AWS_SQS_STORAGE_QUEUE_NAME: test-storage-queue
+      AWS_SQS_STORAGE_QUEUE_URL: https://sqs.us-east-1.amazonaws.com/000000000000/test-storage-queue
+      STRIPE_SECRET_KEY: sk_test_fake_key
+      STRIPE_WEBHOOK_SECRET: whsec_fake_secret
+      FRONTEND_URL: http://localhost:3000
+      
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
