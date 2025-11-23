@@ -20,6 +20,13 @@ import { STORAGE_CONSUMER_NAME, StorageConsumer } from "./storage.consumer";
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => {
+        if (configService.get<string>("NODE_ENV") === "test") {
+          return {
+            consumers: [],
+            producers: [],
+          };
+        }
+        
         const region = configService.get<string>("AWS_REGION");
         const accessKeyId = configService.get<string>("AWS_ACCESS_KEY_ID");
         const secretAccessKey = configService.get<string>(

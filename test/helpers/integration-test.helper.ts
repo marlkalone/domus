@@ -1,58 +1,100 @@
-import { Test, TestingModule } from "@nestjs/testing";
+import { Test, TestingModule } from '@nestjs/testing';
 import { AppModule } from "../../src/app.module";
-import { DataSource } from "typeorm";
-import { INestApplication } from "@nestjs/common";
+import { DataSource } from 'typeorm';
+import { INestApplication, ValidationPipe } from '@nestjs/common';
+import {QueueProducerService} from "../../src/infra/queue/queue.producer.service";
+import {MailService} from "../../src/infra/mail/mail.service";
+import {StorageService} from "../../src/infra/storage/storage.service";
+import {StripeService} from "../../src/infra/stripe/stripe.service";
 
-// Esta é a nossa função de limpeza que será usada em todos os testes
 export const cleanDatabase = async (dataSource: DataSource) => {
-  const entities = [
-    "users",
-    "plans",
-    "projects",
-    "contacts",
-    "tasks",
-    "transactions",
-    "billings",
-    "amenities",
-  ];
+    if (!dataSource || !dataSource.isInitialized) return;
 
-  await dataSource.query(
-    `TRUNCATE ${entities.map((e) => `"${e}"`).join(", ")} RESTART IDENTITY CASCADE;`,
-  );
+    const entities = dataSource.entityMetadatas;
+    const tableNames = entities
+        .map((entity) => `"${entity.tableName}"`)
+        .join(', ');
+
+    if (tableNames.length > 0) {
+        await dataSource.query(`TRUNCATE ${tableNames} RESTART IDENTITY CASCADE;`);
+    }
 };
 
-// Esta função inicializa o app e configura os hooks de limpeza
 export const setupIntegrationTest = () => {
-  let app: INestApplication;
-  let dataSource: DataSource;
+    let app: INestApplication;
+    let dataSource: DataSource;
 
-  beforeAll(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
-    }).compile();
+    const mockQueueProducerService = {
+        sendMessage: jest.fn().mockResolvedValue({ MessageId: 'mock-msg-id' }),
+        sendBatchMessages: jest.fn().mockResolvedValue({ Successful: [], Failed: [] }),
+    };
 
-    app = moduleFixture.createNestApplication();
-    await app.init();
+    const mockMailService = {
+        sendEmail: jest.fn().mockResolvedValue({ MessageId: 'mock-email-id' }),
+    };
 
-    dataSource = app.get<DataSource>(DataSource);
+    const mockStorageService = {
+        uploadFile: jest.fn().mockResolvedValue({ Key: 'mock-key', Location: 'mock-url' }),
+        deleteFile: jest.fn().mockResolvedValue({}),
+        getSignedUrl: jest.fn().mockReturnValue('https://mock-signed-url.com'),
+    };
 
-    // Limpa o banco UMA VEZ antes de começar a suíte
-    await cleanDatabase(dataSource);
-  });
+    const mockStripeService = {
+        createCustomer: jest.fn().mockResolvedValue({ id: 'cus_mock_123', object: 'customer' }),
+        retrieveCustomer: jest.fn().mockResolvedValue({ id: 'cus_mock_123', object: 'customer' }),
+        createCheckoutSession: jest.fn().mockResolvedValue({ id: 'cs_test_123', url: 'http://mock-stripe.com' }),
+        retrieveCheckoutSession: jest.fn().mockResolvedValue({ payment_status: 'paid' }),
+        createPortalSession: jest.fn().mockResolvedValue({ url: 'http://mock-portal.com' }),
+        retrieveSubscription: jest.fn().mockResolvedValue({ status: 'active', items: { data: [] } }),
+        listPrices: jest.fn().mockResolvedValue({ data: [] }),
+        constructEvent: jest.fn().mockReturnValue({ type: 'test.event' }),
+    };
 
-  // Mude de afterEach para beforeEach
-  beforeEach(async () => {
-    // Limpa o banco ANTES de CADA teste
-    await cleanDatabase(dataSource);
-  });
+    beforeAll(async () => {
+        const moduleFixture: TestingModule = await Test.createTestingModule({
+            imports: [AppModule],
+        })
+            .overrideProvider(QueueProducerService)
+            .useValue(mockQueueProducerService)
+            .overrideProvider(MailService)
+            .useValue(mockMailService)
+            .overrideProvider(StorageService)
+            .useValue(mockStorageService)
+            .overrideProvider(StripeService)
+            .useValue(mockStripeService)
+            .compile();
 
-  afterAll(async () => {
-    await app.close();
-  });
+        app = moduleFixture.createNestApplication();
 
-  // Retorna os objetos que os testes precisarão
-  return {
-    getApp: () => app,
-    getDataSource: () => dataSource,
-  };
+        app.useGlobalPipes(
+            new ValidationPipe({
+                transform: true,
+                whitelist: true,
+                forbidNonWhitelisted: true,
+            }),
+        );
+
+        await app.init();
+
+        dataSource = app.get<DataSource>(DataSource);
+        await cleanDatabase(dataSource);
+    });
+
+    beforeEach(async () => {
+        if (dataSource && dataSource.isInitialized) {
+            await cleanDatabase(dataSource);
+        }
+        jest.clearAllMocks();
+    });
+
+    afterAll(async () => {
+        if (app) {
+            await app.close();
+        }
+    });
+
+    return {
+        getApp: () => app,
+        getDataSource: () => dataSource,
+    };
 };
