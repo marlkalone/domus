@@ -75,7 +75,13 @@ jobs:
         run: npm run lint
 
       - name: Run Unit Tests
-        run: npm run test
+        run: npm run test:unit
+
+      - name: Run Integration Tests
+        run: npm run test:integration
+
+      - name: Run E2E Tests
+        run: npm run test:e2e
 
   # ------------------------------------------------------------------
   # JOB 2: ENTREGA CONTÍNUA (Deploy para AWS)
