@@ -11,11 +11,11 @@ export default () => ({
         database: isTest
             ? process.env.DATABASE_NAME_TEST || "domus-db-test"
             : process.env.DATABASE_NAME,
-        synchronize: isTest,
+        synchronize: true,
         logging: ["warn", "error"],
         entities: [path.resolve(__dirname, "..", "**", "*.entity.{ts,js}")],
         migrations: [path.resolve(__dirname, "..", "migrations", "*.{ts,js}")],
         migrationsTableName: "migrations_typeorm",
-        migrationsRun: true,
+        migrationsRun: false,
     },
 });
